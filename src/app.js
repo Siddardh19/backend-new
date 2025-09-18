@@ -20,6 +20,7 @@ import userRouter from "./routes/user.routes.js"
 //Declaring routes using middlewares
 app.use("/api/v1/users", userRouter)
 
+//URL
 //http://localhost:8000/api/v1/users/register
 
 export {app};
