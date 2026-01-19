@@ -361,6 +361,86 @@ const updateCoverImage = asyncHandler(async(req, res) => {
      )
 })
 
+const getUserChannelProfile = asyncHandler(async(req, res) => {
+    
+    //To get the username of the channel, that we are looking for
+    const {username} = req.params //params gets "username" from url
+
+    //If there doesn't exists such user
+    if(!username?.trim()) {
+        throw new ApiError(400, "username is missing")
+    }
+
+    //Using aggregation pipelines to count the no of documents
+    const channel = await User.aggregate([
+        {
+            //To match the documents with the given "username"
+            $match: {
+                username: username?.toLowerCase()
+            }
+        },
+        {
+            //To look for subscribers of a channel
+            $lookup: {
+                from: "subscriptions",
+                localField: "_id",
+                foreignField: "channel",
+                as: "subscribers"
+            }
+        },
+        {
+            //To look for how many channels the "username" has subscribed
+            $lookup: {
+                from: "subscriptions", //database model name
+                localField: "_id", //channel id
+                foreignField: "subscriber", //to match with subscriber field in subscription model
+                as: "subscribedTo" //alias
+            }
+        },
+        {
+            $addFields: {
+                //To count the no of subscribers
+                subscribersCount: {
+                    $size: "$subscribers"
+                },
+                //To count the no of channels, we've subscribed to 
+                channelsSubscribedToCount: {
+                    $size: "$subscribedTo"
+                },
+                //To show whether we subscribed to that channel or not
+                isSubscribed: {
+                    $cond: {
+                        //To find whether our user id exists in the subscribers list of that channel 
+                        if: {$in: [req.user?._id, "$subscribers.subscriber"]},
+                        then: true,
+                        else: false
+                    }
+                }
+            }
+        },
+        {
+            $project: {
+                fullName: 1,
+                username: 1,
+                subscribersCount: 1,
+                channelsSubscribedToCount: 1,
+                isSubscribed: 1,
+                avatar: 1,
+                email: 1
+            }
+        }
+    ])
+    
+    if(!channel?.length) {
+        throw new ApiError(404, "channel does not exists")
+    }
+    
+    return res 
+    .status(200)
+    .json(
+        new ApiResponse(200, channel[0], "User channel fetched successfully" )
+    )
+}) 
 
 export {
     registerUser,
