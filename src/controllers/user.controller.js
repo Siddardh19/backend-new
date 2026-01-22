@@ -5,6 +5,7 @@ import {uploadOnCloudinary} from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import jwt from "jsonwebtoken";
 import { use } from "react";
+import mongoose from "mongoose";
 
 const generateAccessAndRefreshTokens = async(userId) => {
      try {
@@ -276,7 +277,6 @@ const getCurrentUser = asyncHandler(async(req, res) => {
     ))
 })
 
-
 const updateAccountDetails = asyncHandler(async(req, res) => {
       const { fullName, email } = req.body
       
@@ -329,7 +329,6 @@ const updateAvatar = asyncHandler(async(req, res) => {
         new ApiResponse(200, user, "Avatar updated successfully")
      )
 })
-
 
 const updateCoverImage = asyncHandler(async(req, res) => {
      const coverImageLocalPath = req.file?.path
@@ -439,6 +438,69 @@ const getUserChannelProfile = asyncHandler(async(req, res) => {
     .status(200)
     .json(
         new ApiResponse(200, channel[0], "User channel fetched successfully" )
+    )
+}) 
+
+const getWatchHistory = asyncHandler(async(req, res) => {
+
+    const user = await User.aggregate([
+
+        //To match the documents with the given _id
+        {
+            $match: {
+                 //To get the string along with object Id -> coz mongoose doesn't interferes during aggregation
+                _id: new mongoose.Types.ObjectId 
+            }
+        },
+        //To get the "watchHistory" from "videos" to "users"
+        {
+            $lookup: {
+                from: "videos",
+                localField: "watchHistory", //Currently we are in user
+                foreignField: "_id",
+                as: "watchHistory",
+                //Since "owner"(users) is another data model in the "videos" data model -> So we bring the owner(users) seperately using nested pipeline
+                pipeline: [
+                    {
+                        $lookup: {
+                            from: "users",
+                            localField: "owner",
+                            foreignField: "_id",
+                            as: "owner",
+                            //To give only selected values from the owner
+                            pipeline: [
+                                {
+                                   $project: {
+                                       fullName: 1,
+                                       username: 1,
+                                       avatar: 1
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    //To get the first value from the array which we got from owner
+                    {
+                        $addFields: {
+                              owner: {
+                                  $first: "$owner" //To remove from field
+                              }
+                        }
+                    }
+                ]
+            }
+        },
+    
+    ])
+
+    return res
+    .status(200)
+    .json(
+       new ApiResponse(
+            200, 
+            user[0].watchHistory,
+            "watch history fetched successfully"
+      )
     )
 }) 
 
