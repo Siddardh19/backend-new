@@ -4,7 +4,7 @@ import {User} from "../models/user.model.js";
 import {uploadOnCloudinary} from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import jwt from "jsonwebtoken";
-import { use } from "react";
+
 import mongoose from "mongoose";
 
 const generateAccessAndRefreshTokens = async(userId) => {
@@ -163,8 +163,8 @@ const logoutUser = asyncHandler(async(req, res) => {
      await User.findByIdAndUpdate(
          req.user._id,
          {
-            $set: {
-                refreshToken: undefined
+            $unset: {
+                refreshToken: 1
             }
          },
          {
@@ -280,7 +280,7 @@ const getCurrentUser = asyncHandler(async(req, res) => {
 const updateAccountDetails = asyncHandler(async(req, res) => {
       const { fullName, email } = req.body
       
-      if(!fullName || !email) {
+      if(!(fullName || email)) {
          throw new ApiError(400, "All fields are required")
       }
 
@@ -449,7 +449,7 @@ const getWatchHistory = asyncHandler(async(req, res) => {
         {
             $match: {
                  //To get the string along with object Id -> coz mongoose doesn't interferes during aggregation
-                _id: new mongoose.Types.ObjectId 
+                _id: new mongoose.Types.ObjectId(req.user?._id) 
             }
         },
         //To get the "watchHistory" from "videos" to "users"
